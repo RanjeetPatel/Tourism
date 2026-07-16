@@ -1,12 +1,14 @@
+%%writefile tourism_project/model_building/data_register.py
 
 import os
 
-from google.colab import userdata
 from huggingface_hub import HfApi, create_repo
 from huggingface_hub.utils import RepositoryNotFoundError
 
-# Read HF token from Colab Secrets
-token = userdata.get("HF_TOKEN")
+# Read Hugging Face token from environment variable
+token = os.getenv("HF_TOKEN")
+if token is None:
+    raise ValueError("HF_TOKEN environment variable is not set.")
 
 api = HfApi(token=token)
 
