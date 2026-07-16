@@ -1,11 +1,10 @@
-
 # ==========================================================
 # Visit With Us
 # Hugging Face Space Deployment
 #
 # This script uploads the deployment folder
 # to the Hugging Face Space.
-
+# ==========================================================
 
 # ==========================================================
 # Import Required Libraries
@@ -19,7 +18,7 @@ from huggingface_hub import HfApi
 # Configuration
 # ==========================================================
 
-REPO_ID = "RanjeetPatel/Tourism"
+REPO_ID = "ranjeetpatel29/Bank-Customer-Churn"
 
 DEPLOYMENT_FOLDER = "tourism_project/deployment"
 
