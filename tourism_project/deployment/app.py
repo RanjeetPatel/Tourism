@@ -46,7 +46,7 @@ def load_model():
             model_path = hf_hub_download(
                 repo_id="ranjeetpatel29/Bank-Customer-Churn",
                 repo_type="dataset",
-                filename="model.pkl"
+                filename="artifacts/model.pkl"
             )
 
             return joblib.load(model_path)
