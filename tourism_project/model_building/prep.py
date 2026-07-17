@@ -1,18 +1,22 @@
 
 # ==========================================================
-# Import Required Libraries
+# Visit With Us
+# Data Preparation Pipeline
+#
+# Responsibilities
+# 1. Load Raw Dataset from Hugging Face
+# 2. Clean Dataset
+# 3. Feature Engineering
+# 4. Train/Test Split
+# 5. Save Processed Dataset
+# 6. Upload Processed Dataset
 # ==========================================================
 
 import os
-import joblib
 import warnings
-import pandas as pd
 
-from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
+import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from huggingface_hub import HfApi
 
@@ -22,21 +26,27 @@ warnings.filterwarnings("ignore")
 # Hugging Face Configuration
 # ==========================================================
 
-api = HfApi(token=os.getenv("HF_TOKEN"))
+HF_TOKEN = os.getenv("HF_TOKEN")
 
-# Existing dataset repository
+if HF_TOKEN is None:
+    raise ValueError("HF_TOKEN environment variable is not set.")
+
+api = HfApi(token=HF_TOKEN)
+
 REPO_ID = "ranjeetpatel29/Bank-Customer-Churn"
+REPO_TYPE = "dataset"
 
-# Read dataset directly from Hugging Face
-DATASET_PATH = f"hf://datasets/{REPO_ID}/tourism.csv"
+DATASET_PATH = f"hf://datasets/{REPO_ID}/data/tourism.csv"
+
+TARGET = "ProdTaken"
 
 # ==========================================================
 # Load Dataset
 # ==========================================================
 
-print("="*60)
+print("=" * 60)
 print("Loading Dataset...")
-print("="*60)
+print("=" * 60)
 
 df = pd.read_csv(DATASET_PATH)
 
@@ -53,29 +63,28 @@ drop_columns = [
     "CustomerID"
 ]
 
-existing_columns = [
-    col for col in drop_columns
-    if col in df.columns
-]
-
-df.drop(columns=existing_columns, inplace=True)
+df.drop(
+    columns=drop_columns,
+    errors="ignore",
+    inplace=True
+)
 
 df.drop_duplicates(inplace=True)
 
-print(f"Shape after Cleaning : {df.shape}")
+print(f"Dataset Shape After Cleaning : {df.shape}")
 
 # ==========================================================
 # Feature Engineering
 # ==========================================================
 
-print("\nCreating Age Groups...")
+print("\nCreating AgeGroup Feature...")
 
-age_bins = [0,25,35,45,55,100]
+age_bins = [0, 25, 35, 45, 55, 100]
 
 age_labels = [
     "Young Adult",
     "Adult",
-    "Mid Age",
+    "Middle Age",
     "Senior Adult",
     "Senior Citizen"
 ]
@@ -84,70 +93,20 @@ df["AgeGroup"] = pd.cut(
     df["Age"],
     bins=age_bins,
     labels=age_labels,
-    right=False,
-    include_lowest=True
+    include_lowest=True,
+    right=False
 )
 
 print(df["AgeGroup"].value_counts())
-
-# ==========================================================
-# Split Features and Target
-# ==========================================================
-
-TARGET = "ProdTaken"
-
-X = df.drop(columns=[TARGET])
-
-y = df[TARGET]
-
-# ==========================================================
-# Identify Numerical and Categorical Columns
-# ==========================================================
-
-numerical_columns = X.select_dtypes(
-    include=["int64","float64"]
-).columns.tolist()
-
-categorical_columns = X.select_dtypes(
-    include=["object","category"]
-).columns.tolist()
-
-print("\nNumerical Columns")
-print(numerical_columns)
-
-print("\nCategorical Columns")
-print(categorical_columns)
-
-# ==========================================================
-# Preprocessing Pipelines
-# ==========================================================
-
-numeric_pipeline = Pipeline(
-    [
-        ("imputer", SimpleImputer(strategy="median")),
-        ("scaler", StandardScaler())
-    ]
-)
-
-categorical_pipeline = Pipeline(
-    [
-        ("imputer", SimpleImputer(strategy="most_frequent")),
-        ("encoder", OneHotEncoder(handle_unknown="ignore"))
-    ]
-)
-
-preprocessor = ColumnTransformer(
-    [
-        ("num", numeric_pipeline, numerical_columns),
-        ("cat", categorical_pipeline, categorical_columns)
-    ]
-)
 
 # ==========================================================
 # Train Test Split
 # ==========================================================
 
 print("\nSplitting Dataset...")
+
+X = df.drop(columns=[TARGET])
+y = df[TARGET]
 
 X_train, X_test, y_train, y_test = train_test_split(
     X,
@@ -157,89 +116,59 @@ X_train, X_test, y_train, y_test = train_test_split(
     stratify=y
 )
 
-# ==========================================================
-# Fit & Transform
-# ==========================================================
-
-print("\nApplying Data Transformation...")
-
-X_train = preprocessor.fit_transform(X_train)
-
-X_test = preprocessor.transform(X_test)
-
-feature_names = preprocessor.get_feature_names_out()
-
-X_train = pd.DataFrame(
-    X_train,
-    columns=feature_names
-)
-
-X_test = pd.DataFrame(
-    X_test,
-    columns=feature_names
-)
-
-X_train[TARGET] = y_train.reset_index(drop=True)
-
-X_test[TARGET] = y_test.reset_index(drop=True)
+print(f"Training Records : {len(X_train)}")
+print(f"Testing Records  : {len(X_test)}")
 
 # ==========================================================
-# Save Artifacts
+# Save Processed Dataset
 # ==========================================================
 
-print("\nSaving Artifacts...")
+print("\nSaving Processed Dataset...")
 
-joblib.dump(
-    preprocessor,
-    "preprocessor.pkl"
-)
+train_df = X_train.copy()
+train_df[TARGET] = y_train.reset_index(drop=True)
 
-joblib.dump(
-    feature_names,
-    "feature_names.pkl"
-)
+test_df = X_test.copy()
+test_df[TARGET] = y_test.reset_index(drop=True)
 
-X_train.to_csv(
+train_df.to_csv(
     "train.csv",
     index=False
 )
 
-X_test.to_csv(
+test_df.to_csv(
     "test.csv",
     index=False
 )
 
-print("Artifacts Saved Successfully.")
+print("Processed datasets saved successfully.")
 
 # ==========================================================
-# Upload Artifacts to Hugging Face Dataset
+# Upload Processed Dataset
 # ==========================================================
 
-print("\nUploading Artifacts to Hugging Face...")
+print("\nUploading Processed Dataset...")
 
 files = [
     "train.csv",
-    "test.csv",
-    "preprocessor.pkl",
-    "feature_names.pkl"
+    "test.csv"
 ]
 
 for file in files:
 
     api.upload_file(
-
         path_or_fileobj=file,
-
-        path_in_repo=file,
-
+        path_in_repo=f"processed/{file}",
         repo_id=REPO_ID,
-
-        repo_type="dataset"
-
+        repo_type=REPO_TYPE
     )
 
-print("\nUpload Completed Successfully.")
+print("Processed datasets uploaded successfully.")
 
-print("="*60)
-print("Data Preparation Pipeline Completed.")
-print("="*60)
+# ==========================================================
+# Completed
+# ==========================================================
+
+print("\n" + "=" * 60)
+print("Data Preparation Pipeline Completed Successfully")
+print("=" * 60)

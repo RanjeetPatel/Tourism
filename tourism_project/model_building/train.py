@@ -1,4 +1,5 @@
 
+
 # ==========================================================
 # Visit With Us
 # Wellness Tourism Package Purchase Prediction
@@ -6,15 +7,14 @@
 # Production Training Pipeline
 #
 # Responsibilities
-# 1. Load Dataset
-# 2. Feature Engineering
-# 3. Build Preprocessing Pipeline
-# 4. Train XGBoost Model
-# 5. Hyperparameter Tuning
-# 6. MLflow Experiment Tracking
-# 7. Evaluate Model
-# 8. Save Pipeline
-# 9. Upload Pipeline to Hugging Face
+# 1. Load Processed  Dataset
+# 2. Build Preprocessing Pipeline
+# 3 Train XGBoost Model
+# 4. Hyperparameter Tuning
+# 5. MLflow Experiment Tracking
+# 6. Evaluate Model
+# 7. Save Pipeline
+# 8. Upload Pipeline to Hugging Face
 # ==========================================================
 
 # ==========================================================
@@ -44,7 +44,6 @@ from sklearn.preprocessing import (
 
 # Model Training
 from sklearn.model_selection import (
-    train_test_split,
     GridSearchCV,
     StratifiedKFold
 )
@@ -63,8 +62,16 @@ from sklearn.metrics import (
 # ==========================================================
 # Configuration
 # ==========================================================
+REPO_ID = "ranjeetpatel29/Bank-Customer-Churn"
+REPO_TYPE = "dataset"
 
-DATA_PATH = "tourism_project/data/tourism.csv"
+TRAIN_DATA_PATH = (
+    f"hf://datasets/{REPO_ID}/processed/train.csv"
+)
+
+TEST_DATA_PATH = (
+    f"hf://datasets/{REPO_ID}/processed/test.csv"
+)
 
 ARTIFACT_PATH = "tourism_project/artifacts"
 
@@ -72,17 +79,14 @@ MODEL_PATH = os.path.join(
     ARTIFACT_PATH,
     "model.pkl"
 )
-
-TARGET = "ProdTaken"
-
-CLASSIFICATION_THRESHOLD = 0.45
-
-REPO_ID = "ranjeetpatel29/Bank-Customer-Churn"
-
 os.makedirs(
     ARTIFACT_PATH,
     exist_ok=True
 )
+
+TARGET = "ProdTaken"
+
+CLASSIFICATION_THRESHOLD = 0.45
 
 # ==========================================================
 # Hugging Face Configuration
@@ -113,70 +117,24 @@ def configure_mlflow():
 def load_dataset():
 
     print("=" * 80)
-    print("Loading Dataset")
+    print("Loading Processed Dataset")
     print("=" * 80)
 
-    df = pd.read_csv(DATA_PATH)
+    train_df = pd.read_csv(TRAIN_DATA_PATH)
+    test_df = pd.read_csv(TEST_DATA_PATH)
 
-    print(f"Dataset Shape : {df.shape}")
+    print(f"Training Shape : {train_df.shape}")
+    print(f"Testing Shape  : {test_df.shape}")
 
-    return df
+    Xtrain = train_df.drop(columns=[TARGET])
+    ytrain = train_df[TARGET]
 
-# ==========================================================
-# Create Age Groups
-# ==========================================================
-
-def create_age_group(df):
-
-    print("Creating Age Groups...")
-
-    bins = [0, 25, 35, 45, 55, 100]
-
-    labels = [
-        "Young Adult",
-        "Adult",
-        "Middle Age",
-        "Senior Adult",
-        "Senior Citizen"
-    ]
-
-    df["AgeGroup"] = pd.cut(
-        df["Age"],
-        bins=bins,
-        labels=labels,
-        include_lowest=True,
-        right=False
-    )
-
-    return df
-
-# ==========================================================
-# Split Dataset
-# ==========================================================
-
-def split_dataset(df):
-
-    print("=" * 80)
-    print("Splitting Dataset")
-    print("=" * 80)
-
-    X = df.drop(columns=[TARGET])
-
-    y = df[TARGET]
-
-    Xtrain, Xtest, ytrain, ytest = train_test_split(
-        X,
-        y,
-        test_size=0.20,
-        random_state=42,
-        stratify=y
-    )
-
-    print(f"Training Records : {len(Xtrain)}")
-    print(f"Testing Records  : {len(Xtest)}")
+    Xtest = test_df.drop(columns=[TARGET])
+    ytest = test_df[TARGET]
 
     return Xtrain, Xtest, ytrain, ytest
-    # ==========================================================
+
+# ==========================================================
 # Create Preprocessing Pipeline
 # ==========================================================
 
@@ -274,7 +232,8 @@ def create_model(ytrain):
 
         scale_pos_weight=class_weight,
 
-        tree_method="hist"
+        tree_method="hist",
+        n_jobs=-1
 
     )
 
@@ -597,11 +556,11 @@ def upload_model():
 
         path_or_fileobj=MODEL_PATH,
 
-        path_in_repo="model.pkl",
+        path_in_repo="artifacts/model.pkl",
 
         repo_id=REPO_ID,
 
-        repo_type="dataset"
+        repo_type=REPO_TYPE
 
     )
 
@@ -617,17 +576,12 @@ def main():
     # Configure MLflow
     configure_mlflow()
 
-    # Load Dataset
-    df = load_dataset()
-
-    # Feature Engineering
-    df = create_age_group(df)
-
-    # Train-Test Split
-    Xtrain, Xtest, ytrain, ytest = split_dataset(df)
+    # Load Processed Dataset
+    Xtrain, Xtest, ytrain, ytest = load_dataset()
 
     # Create Preprocessor
     preprocessor = create_preprocessor(Xtrain)
+
 
     # Create XGBoost Model
     model = create_model(ytrain)
