@@ -126,10 +126,10 @@ print(f"Testing Records  : {len(X_test)}")
 print("\nSaving Processed Dataset...")
 
 train_df = X_train.copy()
-train_df[TARGET] = y_train.reset_index(drop=True)
+train_df[TARGET] = y_train
 
 test_df = X_test.copy()
-test_df[TARGET] = y_test.reset_index(drop=True)
+test_df[TARGET] = y_test
 
 train_df.to_csv(
     "train.csv",
